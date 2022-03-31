@@ -1,7 +1,7 @@
 package io.onfhir.template
 
 import io.onfhir.expression.{FhirExpression, FhirExpressionException, IFhirExpressionLanguageHandler}
-import io.onfhir.path.{FhirPathBoolean, FhirPathComplex, FhirPathDateTime, FhirPathEvaluator, FhirPathNumber, FhirPathQuantity, FhirPathString, FhirPathTime}
+import io.onfhir.path.{FhirPathBoolean, FhirPathComplex, FhirPathDateTime, FhirPathEvaluator, FhirPathNumber, FhirPathQuantity, FhirPathString, FhirPathTime, IFhirPathFunctionLibraryFactory}
 import org.json4s.{JArray, JNothing, JNull, JObject, JString, JValue}
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -10,9 +10,12 @@ import io.onfhir.util.JsonFormatter._
 
 /**
  * Expression handler for FHIR template language (mustache like) that we devise within onFhir to create dynamic FHIR contents based on placeholder FHIR Path expressions within the template
- * @param staticContextParams Context params that will be supplied to every evaluation with this instance
+ * @param staticContextParams       Context params that will be supplied to every evaluation with this instance
+ * @param functionLibraryFactories  Function libraries for FHIR Path expression evaluation
  */
-class FhirTemplateExpressionHandler(staticContextParams: Map[String, JValue] = Map.empty)  extends IFhirExpressionLanguageHandler {
+class FhirTemplateExpressionHandler(
+                                     staticContextParams: Map[String, JValue] = Map.empty,
+                                     functionLibraryFactories:Map[String, IFhirPathFunctionLibraryFactory] = Map.empty)  extends IFhirExpressionLanguageHandler {
   /**
    * Supported language mime type
    */
@@ -69,7 +72,7 @@ class FhirTemplateExpressionHandler(staticContextParams: Map[String, JValue] = M
     Future.apply {
       val fhirTemplate = expression.value.get
 
-      val fhirPathEvaluator = FhirPathEvaluator.apply(staticContextParams ++ contextParams)
+      val fhirPathEvaluator = FhirPathEvaluator.apply(staticContextParams ++ contextParams, functionLibraryFactories)
 
       val filledTemplate = evaluateTemplate(fhirTemplate, fhirPathEvaluator, input)
 
