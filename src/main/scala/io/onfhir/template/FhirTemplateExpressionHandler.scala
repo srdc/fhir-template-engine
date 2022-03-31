@@ -12,7 +12,7 @@ import io.onfhir.util.JsonFormatter._
  * Expression handler for FHIR template language (mustache like) that we devise within onFhir to create dynamic FHIR contents based on placeholder FHIR Path expressions within the template
  * @param staticContextParams Context params that will be supplied to every evaluation with this instance
  */
-class FhirTemplateExpressionHandler(staticContextParams: Map[String, JValue]) extends IFhirExpressionLanguageHandler {
+class FhirTemplateExpressionHandler(staticContextParams: Map[String, JValue] = Map.empty)  extends IFhirExpressionLanguageHandler {
   /**
    * Supported language mime type
    */
