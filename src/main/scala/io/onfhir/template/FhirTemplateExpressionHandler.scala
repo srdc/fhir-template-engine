@@ -39,6 +39,11 @@ class FhirTemplateExpressionHandler(
   private val templateSectionExpressionValue = """^\{\{([^"{}]+)\}\}$""".r
 
   /**
+   * Base FHIR path evaluator
+   */
+  val fhirPathEvaluator =  FhirPathEvaluator.apply(staticContextParams, functionLibraryFactories)
+
+  /**
    * Validate the expression
    * @param expression  Parsed expression
    */
@@ -71,10 +76,10 @@ class FhirTemplateExpressionHandler(
   override def evaluateExpression(expression: FhirExpression, contextParams: Map[String, JValue], input: JValue)(implicit ex: ExecutionContext): Future[JValue] = {
     Future.apply {
       val fhirTemplate = expression.value.get
+      //Get the final evaluator
+      val evaluator = if(contextParams.isEmpty) fhirPathEvaluator else fhirPathEvaluator.copy(environmentVariables = fhirPathEvaluator.environmentVariables ++ contextParams)
 
-      val fhirPathEvaluator = FhirPathEvaluator.apply(staticContextParams ++ contextParams, functionLibraryFactories)
-
-      val filledTemplate = evaluateTemplate(fhirTemplate, fhirPathEvaluator, input)
+      val filledTemplate = evaluateTemplate(fhirTemplate, evaluator, input)
 
       removeEmptyFields(filledTemplate)
     }
