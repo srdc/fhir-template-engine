@@ -105,13 +105,19 @@ class FhirTemplateExpressionHandler(
       case JString(s) =>
         handleInternalMatches(s, fhirPathEvaluator, input)
 
-      //A section definition within template (like mustache sections) for repetitive or optional fields
+      //A section definition within template (like mustache sections) for repetitive or optional sections
       case JObject(List((sectionField,JString(sectionStatement)), (valueField,valuePart))) if sectionField.startsWith("{{#") && sectionField.endsWith("}}")  =>
         handleTemplateSection(sectionField, sectionStatement, valueField, valuePart, fhirPathEvaluator, input)
 
       //Go recursive on fields
       case JObject(fields) => JObject(fields.map(f => f._1 -> evaluateTemplate(f._2, fhirPathEvaluator, input)))
-      case JArray(vs) => JArray(vs.map(evaluateTemplate(_, fhirPathEvaluator, input)))
+      case JArray(vs) =>
+        JArray(vs.flatMap(
+          evaluateTemplate(_, fhirPathEvaluator, input) match {
+            case arr:JArray => arr.arr  //If the inner part returns an array merge it with others as generally we don't have array of arrays in FHIR
+            case oth => List(oth)
+          }
+        ))
       //Otherwise the same
       case oth => oth
     }
