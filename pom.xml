@@ -25,7 +25,7 @@
         <scala.version>2.13.8</scala.version>
         <scala.binary.version>2.13</scala.binary.version>
         <onfhir.version>3.2-SNAPSHOT</onfhir.version>
-        <json4s.version>4.0.4</json4s.version>
+        <json4s.version>3.7.0-M11</json4s.version>
         <scalatest.version>3.1.4</scalatest.version>
     </properties>
 
@@ -36,6 +36,7 @@
             <plugin>
                 <groupId>net.alchim31.maven</groupId>
                 <artifactId>scala-maven-plugin</artifactId>
+                <version>${scala-maven-plugin.version}</version>
                 <configuration>
                     <scalaVersion>${scala.version}</scalaVersion>
                     <scalaCompatVersion>${scala.binary.version}</scalaCompatVersion>

@@ -15,7 +15,7 @@ import io.onfhir.util.JsonFormatter._
  */
 class FhirTemplateExpressionHandler(
                                      staticContextParams: Map[String, JValue] = Map.empty,
-                                     functionLibraryFactories:Map[String, IFhirPathFunctionLibraryFactory] = Map.empty)  extends IFhirExpressionLanguageHandler {
+                                     functionLibraryFactories:Map[String, IFhirPathFunctionLibraryFactory] = Map.empty)  extends IFhirExpressionLanguageHandler with Serializable {
   /**
    * Supported language mime type
    */
@@ -115,6 +115,7 @@ class FhirTemplateExpressionHandler(
         JArray(vs.flatMap(
           evaluateTemplate(_, fhirPathEvaluator, input) match {
             case arr:JArray => arr.arr  //If the inner part returns an array merge it with others as generally we don't have array of arrays in FHIR
+            case JNull | JNothing => Nil
             case oth => List(oth)
           }
         ))
