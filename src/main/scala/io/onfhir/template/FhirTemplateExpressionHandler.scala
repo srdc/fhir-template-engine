@@ -24,11 +24,11 @@ class FhirTemplateExpressionHandler(
   /**
    * Regular expression for a placeholder expression that is the whole JSON value
    */
-  private val templateFullPlaceholderValuePattern = """^\{\{((\*?)(\??) )?([^"{}]+)\}\}$""".r
+  private val templateFullPlaceholderValuePattern = """^\{\{(([\* \+ \?]?) )?(((?!\{\{).)+)\}\}$""".r
   /**
    * Regular expression for a placeholder expression that is within the JSON values
    */
-  private val templatePlaceholderInside = """\{\{([^"{}]+)\}\}""".r
+  private val templatePlaceholderInside = """\{\{(((?!\{\{).)+)\}\}""".r
   /**
    * Regular expression for Template Section Field
    */
@@ -36,7 +36,7 @@ class FhirTemplateExpressionHandler(
   /**
    * Regular expression for Template Section Value
    */
-  private val templateSectionExpressionValue = """^\{\{([^"{}]+)\}\}$""".r
+  private val templateSectionExpressionValue = """^\{\{(((?!\{\{).)+)\}\}$""".r
 
   /**
    * Base FHIR path evaluator
@@ -97,8 +97,10 @@ class FhirTemplateExpressionHandler(
       // The value is given by a placeholder
       case JString(s) if s.startsWith("{{") && s.endsWith("}}") =>
         templateFullPlaceholderValuePattern.findFirstMatchIn(s) match {
-          case None => handleInternalMatches(s, fhirPathEvaluator, input)
-          case Some(m) => handleCompleteValueMatch(m, fhirPathEvaluator, input)
+          case None =>
+            handleInternalMatches(s, fhirPathEvaluator, input)
+          case Some(m) =>
+            handleCompleteValueMatch(m, fhirPathEvaluator, input)
         }
 
       //There may be some placeholders within the string
@@ -226,9 +228,10 @@ class FhirTemplateExpressionHandler(
    * @return
    */
   private def handleCompleteValueMatch(m:Regex.Match, fhirPathEvaluator:FhirPathEvaluator, input:JValue):JValue = {
-    val isArray = m.group(2) == "*"
-    val isOptional = m.group(3) == "?"
-    val fhirPathExpression = m.group(4)
+    val indicator = m.group(2)
+    val isArray = indicator == "*" || indicator == "+"
+    val isOptional = indicator == "*" || indicator == "?"
+    val fhirPathExpression = m.group(3)
 
     val result =
       fhirPathEvaluator

@@ -3,9 +3,7 @@
   "language": "application/fhir-template+json",
   "value": {
     "resourceType": "Communication",
-    "instantiatesUri": [
-      "http://onfhir.io/PipelineDefinition/communication-created-pipeline"
-    ],
+    "instantiatesUri": "{{+ 'http://onfhir.io/PipelineDefinition/communication-created-pipeline'}}",
     "status": "completed",
     "extension": [
       {

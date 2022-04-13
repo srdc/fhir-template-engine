@@ -14,7 +14,8 @@ JSON object or array which set the value of the field. Further marks are needed 
 If the element is optional, and your FHIR Path statement can return empty result, then you should use '?' mark after the
 parenthesis and after the empty space provide the FHIR path expression. If '?' is not used, and the expression returns
 an empty result then an exception is thrown. If the FHIR element is an array then you should indicate this with mark '*'
-after the parenthesis again. Otherwise, if it is not used and the expression returns an array or vice versa then an
+after the parenthesis again if cardinality is 0-n or '+' if it is array but minimum cardinality is one. 
+Otherwise, if it is not used and the expression returns an array or vice versa then an
 exception is thrown.
 
 The following snapshot illustrates this usage. The subject element in Communication is optional,
@@ -22,7 +23,7 @@ and assume that we may have Observations that has no subject. This assignment se
 extracted from the event content (the Observation). If there is no subject then field is not included in the result.
 The placeholder for 'sent' element is another example. This time as we know that our expression always return the time
 during the execution of the template expression we don't use '?' mark. Finally, in the last one we also use the '*' mark
-to indicate that reasonCode is an array element. In this case, even there is only one category coe in Observation,
+to indicate that reasonCode is an array element. In this case, even there is only one category code in Observation,
 the result will be an array. As we also use the '?' mark, if there is no category in the Observation event the element
 'reasonCode' is not included in the final FHIR content.
 ```
@@ -31,7 +32,7 @@ the result will be an array. As we also use the '?' mark, if there is no categor
   ...,
   "subject": "{{? Observation.subject}}",
   "sent": "{{now()}}",
-  "reasonCode": "{{*? Observation.category}}"
+  "reasonCode": "{{* Observation.category}}"
   ...
 }
 ```
