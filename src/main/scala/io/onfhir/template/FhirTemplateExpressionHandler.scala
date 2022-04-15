@@ -109,10 +109,16 @@ class FhirTemplateExpressionHandler(
 
       //A section definition within template (like mustache sections) for repetitive or optional sections
       case JObject(List((sectionField,JString(sectionStatement)), (valueField,valuePart))) if sectionField.startsWith("{{#") && sectionField.endsWith("}}")  =>
-        handleTemplateSection(sectionField, sectionStatement, valueField, valuePart, fhirPathEvaluator, input)
-
+        val result = handleTemplateSection(sectionField, sectionStatement, valueField, valuePart, fhirPathEvaluator, input)
+        result
       //Go recursive on fields
-      case JObject(fields) => JObject(fields.map(f => f._1 -> evaluateTemplate(f._2, fhirPathEvaluator, input)))
+      case JObject(fields) =>
+        JObject(
+          fields.map(f => {
+            val fieldValue = evaluateTemplate(f._2, fhirPathEvaluator, input)
+            f._1 -> fieldValue
+          })
+        )
       case JArray(vs) =>
         JArray(vs.flatMap(
           evaluateTemplate(_, fhirPathEvaluator, input) match {
@@ -149,16 +155,37 @@ class FhirTemplateExpressionHandler(
     }
     //Evaluate the section variable statement
     val sectionResults = fhirPathEvaluator.evaluate(sectionPathStatement, input).map(_.toJson)
-    //For each entry for the section variable evaluate the section value part
+
     val finalResults =
-      sectionResults
-        .map(sectionResult => {
-          evaluateTemplate(valuePart, fhirPathEvaluator.withEnvironmentVariable(sectionFieldVar, sectionResult), input)
-        })
+      valueField match {
+        //If it is optional provide the whole section results as context param
+        case "{{?}}" if sectionResults.nonEmpty =>
+          Seq(
+            evaluateTemplate(
+              valuePart,
+              fhirPathEvaluator.withEnvironmentVariable(sectionFieldVar, sectionResults match {
+                case Seq(single) => single
+                case oth => JArray(oth.toList)
+              }),
+              input
+            )
+          )
+        //For each entry for the section variable evaluate the section value part, by providing each element of section results as context param
+        case _ =>
+          sectionResults
+            .map(sectionResult => {
+              evaluateTemplate(valuePart, fhirPathEvaluator.withEnvironmentVariable(sectionFieldVar, sectionResult), input)
+            })
+      }
 
     valueField match {
       //section is an array
       case "{{*}}" => if(finalResults.isEmpty) JNull else JArray(finalResults.toList)
+      case "{{+}}" =>
+        if(finalResults.isEmpty)
+          throw  FhirExpressionException(s"Template section returns empty although value is marked with '+' (1-n cardinality)")
+        else
+          JArray(finalResults.toList)
       case "{{?}}" => finalResults.headOption.getOrElse(JNull)
       case _ => throw  FhirExpressionException(s"Invalid FHIR template section value field '$valueField'! Use '{{*}}' for arrays and '{{?}}' for optional JSON objects.")
     }
