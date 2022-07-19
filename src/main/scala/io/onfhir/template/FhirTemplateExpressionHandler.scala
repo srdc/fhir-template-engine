@@ -1,5 +1,6 @@
 package io.onfhir.template
 
+import io.onfhir.api.service.{IFhirIdentityService, IFhirTerminologyService}
 import io.onfhir.expression.{FhirExpression, FhirExpressionException, IFhirExpressionLanguageHandler}
 import io.onfhir.path.{FhirPathBoolean, FhirPathComplex, FhirPathDateTime, FhirPathEvaluator, FhirPathNumber, FhirPathQuantity, FhirPathString, FhirPathTime, IFhirPathFunctionLibraryFactory}
 import org.json4s.{JArray, JNothing, JNull, JObject, JString, JValue}
@@ -12,10 +13,15 @@ import io.onfhir.util.JsonFormatter._
  * Expression handler for FHIR template language (mustache like) that we devise within onFhir to create dynamic FHIR contents based on placeholder FHIR Path expressions within the template
  * @param staticContextParams       Context params that will be supplied to every evaluation with this instance
  * @param functionLibraryFactories  Function libraries for FHIR Path expression evaluation
+ * @param terminologyService        In order to use FHIR Path terminology service functions, the service itself
+ * @param identityService           In order to use FHIR Path identity service function, the service itself
  */
 class FhirTemplateExpressionHandler(
                                      staticContextParams: Map[String, JValue] = Map.empty,
-                                     functionLibraryFactories:Map[String, IFhirPathFunctionLibraryFactory] = Map.empty)  extends IFhirExpressionLanguageHandler with Serializable {
+                                     functionLibraryFactories:Map[String, IFhirPathFunctionLibraryFactory] = Map.empty,
+                                     terminologyService:Option[IFhirTerminologyService] = None,
+                                     identityService:Option[IFhirIdentityService] = None
+                                   )  extends IFhirExpressionLanguageHandler with Serializable {
   /**
    * Supported language mime type
    */
@@ -41,7 +47,12 @@ class FhirTemplateExpressionHandler(
   /**
    * Base FHIR path evaluator
    */
-  val fhirPathEvaluator =  FhirPathEvaluator.apply(staticContextParams, functionLibraryFactories)
+  val fhirPathEvaluator:FhirPathEvaluator = {
+    var temp = FhirPathEvaluator.apply(staticContextParams, functionLibraryFactories)
+    terminologyService.foreach(ts => temp = temp.withTerminologyService(ts))
+    identityService.foreach(is => temp = temp.withIdentityService(is))
+    temp
+  }
 
   /**
    * Validate the expression
