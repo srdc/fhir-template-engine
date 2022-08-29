@@ -2,7 +2,7 @@ package io.onfhir.template
 
 import io.onfhir.api.service.{IFhirIdentityService, IFhirTerminologyService}
 import io.onfhir.expression.{FhirExpression, FhirExpressionException, IFhirExpressionLanguageHandler}
-import io.onfhir.path.{FhirPathBoolean, FhirPathComplex, FhirPathDateTime, FhirPathEvaluator, FhirPathNumber, FhirPathQuantity, FhirPathString, FhirPathTime, IFhirPathFunctionLibraryFactory}
+import io.onfhir.path.{FhirPathBoolean, FhirPathComplex, FhirPathDateTime, FhirPathEvaluator, FhirPathNumber, FhirPathQuantity, FhirPathResult, FhirPathString, FhirPathTime, IFhirPathFunctionLibraryFactory}
 import org.json4s.{JArray, JNothing, JNull, JObject, JString, JValue}
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -145,27 +145,32 @@ class FhirTemplateExpressionHandler(
 
   /**
    * Handle template section
-   * @param sectionField
-   * @param sectionStatement
-   * @param valueField
-   * @param valuePart
-   * @param fhirPathEvaluator
-   * @param input
+   * @param sectionField        Section element field name e.g. {{#member}}
+   * @param sectionStatement    Section element field value (FHIR Path statement) e.g.  {{CareTeam.participant.member}}
+   * @param valueField          Section value field name e.g. {{?}} or {{*}}
+   * @param valuePart           Section value field value
+   * @param fhirPathEvaluator   FHIR Path evaluator
+   * @param input               Current input for evaluation
    * @return
    */
   private def handleTemplateSection(sectionField:String, sectionStatement:String, valueField:String, valuePart:JValue, fhirPathEvaluator:FhirPathEvaluator,  input: JValue):JValue = {
     //Resolve section variable name e.g. {{#member}} -> member
     val sectionFieldVar = templateSectionField.findFirstMatchIn(sectionField) match {
-      case None => throw FhirExpressionException(s"Invalid FHIR template section field '$sectionField'! It should be in format {{#<variable-name>}} e.g. {{#member}}.")
+      case None => throw FhirExpressionException(s"Invalid FHIR template section field! It should be in format {{#<variable-name>}} e.g. {{#member}}.", Some(sectionField))
       case Some(m) => m.group(1)
     }
     //Resolve section variable FHIR Path statement e.g. {{CareTeam.participant.member}}
     val sectionPathStatement = templateSectionExpressionValue.findFirstMatchIn(sectionStatement) match {
-      case None => throw FhirExpressionException(s"Invalid FHIR template section statement '$sectionStatement'! It should be in format {{<FHIR path statement>}}.")
+      case None => throw FhirExpressionException(s"Invalid FHIR template section statement! It should be in format {{<FHIR path statement>}}.", Some(sectionStatement))
       case Some(s) => s.group(1)
     }
     //Evaluate the section variable statement
-    val sectionResults = fhirPathEvaluator.evaluate(sectionPathStatement, input).map(_.toJson)
+    val sectionResults =
+      try {
+        fhirPathEvaluator.evaluate(sectionPathStatement, input).map(_.toJson)
+      } catch {
+        case t:Throwable => throw FhirExpressionException("Problem while evaluating section statement!", Some(sectionPathStatement), Some(t))
+      }
 
     val finalResults =
       valueField match {
@@ -194,11 +199,11 @@ class FhirTemplateExpressionHandler(
       case "{{*}}" => if(finalResults.isEmpty) JNull else JArray(finalResults.toList)
       case "{{+}}" =>
         if(finalResults.isEmpty)
-          throw  FhirExpressionException(s"Template section returns empty although value is marked with '+' (1-n cardinality)")
+          throw  FhirExpressionException(s"Template section returns empty although value is marked with '+' (1-n cardinality)!", Some(valuePart.toJson))
         else
           JArray(finalResults.toList)
       case "{{?}}" => finalResults.headOption.getOrElse(JNull)
-      case _ => throw  FhirExpressionException(s"Invalid FHIR template section value field '$valueField'! Use '{{*}}' for arrays and '{{?}}' for optional JSON objects.")
+      case _ => throw  FhirExpressionException(s"Invalid FHIR template section value field! Use '{{*}}' for arrays and '{{?}}' for optional JSON objects.", Some(valueField))
     }
   }
 
@@ -237,10 +242,16 @@ class FhirTemplateExpressionHandler(
   private def handleInternalMatches(strValue:String, fhirPathEvaluator:FhirPathEvaluator, input:JValue):JString = {
     def findMatch(m:Regex.Match):String = {
       val fhirPathExpression = m.group(1)
-      fhirPathEvaluator.evaluate(fhirPathExpression, input) match {
+      val fhirPathResult:Seq[FhirPathResult] =
+        try {
+          fhirPathEvaluator.evaluate(fhirPathExpression, input)
+        } catch {
+          case t:Throwable => throw FhirExpressionException("Problem while evaluating internal FHIR Path expression!", Some(fhirPathExpression),Some(t))
+        }
+      fhirPathResult match {
         case Seq(fhirPathResult) => fhirPathResult match {
           case FhirPathComplex(_) | FhirPathQuantity(_, _) =>
-            throw FhirExpressionException(s"FHIR path expression '$fhirPathExpression' returns complex JSON object although it is used within a FHIR string value!")
+            throw FhirExpressionException(s"FHIR path expression returns complex JSON object although it is used within a FHIR string value!", Some(fhirPathExpression))
           case FhirPathString(s) => s
           case FhirPathNumber(n) => "" + n.toDouble.toString
           case FhirPathBoolean(b) => "" + b
@@ -249,7 +260,7 @@ class FhirTemplateExpressionHandler(
           case t:FhirPathTime => t.toJson.toJson.dropRight(1).drop(1)
         }
         case _ =>
-          throw FhirExpressionException(s"FHIR path expression '$fhirPathExpression' returns multiple or empty result although it is used within a FHIR string value!")
+          throw FhirExpressionException(s"FHIR path expression returns multiple or empty result although it is used within a FHIR string value!", Some(fhirPathExpression))
       }
     }
 
@@ -271,16 +282,20 @@ class FhirTemplateExpressionHandler(
     val isOptional = indicator == "*" || indicator == "?"
     val fhirPathExpression = m.group(3)
 
-    val result =
-      fhirPathEvaluator
-        .evaluate(fhirPathExpression, input)
-        .map(_.toJson)
+    val fhirPathResult:Seq[FhirPathResult] =
+      try {
+        fhirPathEvaluator.evaluate(fhirPathExpression, input)
+      } catch {
+        case t:Throwable => throw FhirExpressionException("Problem while evaluating FHIR Path expression!", Some(fhirPathExpression), Some(t))
+      }
+
+    val result = fhirPathResult.map(_.toJson)
 
     if(!isOptional && result.isEmpty)
-      throw FhirExpressionException(s"FHIR path expression '$fhirPathExpression' returns empty although value is not marked as optional! Please use '?' mark in placeholder e.g. {{? <fhir-path-expression>}}  or correct your expression")
+      throw FhirExpressionException(s"FHIR path expression returns empty although value is not marked as optional! Please use '?' mark in placeholder e.g. {{? <fhir-path-expression>}}  or correct your expression", Some(fhirPathExpression))
 
     if(!isArray && result.length > 1)
-      throw FhirExpressionException(s"FHIR path expression '$fhirPathExpression' returns multiple results although value is not marked as array! Please use '*' mark in placeholder e.g. {{* <fhir-path-expression>}} or correct your expression")
+      throw FhirExpressionException(s"FHIR path expression returns multiple results although value is not marked as array! Please use '*' mark in placeholder e.g. {{* <fhir-path-expression>}} or correct your expression", Some(fhirPathExpression))
 
     if(isArray)
       JArray(result.toList)
