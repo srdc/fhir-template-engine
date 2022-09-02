@@ -15,12 +15,14 @@ import io.onfhir.util.JsonFormatter._
  * @param functionLibraryFactories  Function libraries for FHIR Path expression evaluation
  * @param terminologyService        In order to use FHIR Path terminology service functions, the service itself
  * @param identityService           In order to use FHIR Path identity service function, the service itself
+ * @param isSourceContentFhir       Whether the source content will be FHIR or not
  */
 class FhirTemplateExpressionHandler(
                                      staticContextParams: Map[String, JValue] = Map.empty,
                                      functionLibraryFactories:Map[String, IFhirPathFunctionLibraryFactory] = Map.empty,
                                      terminologyService:Option[IFhirTerminologyService] = None,
-                                     identityService:Option[IFhirIdentityService] = None
+                                     identityService:Option[IFhirIdentityService] = None,
+                                     isSourceContentFhir:Boolean = false
                                    )  extends IFhirExpressionLanguageHandler with Serializable {
   /**
    * Supported language mime type
@@ -48,7 +50,7 @@ class FhirTemplateExpressionHandler(
    * Base FHIR path evaluator
    */
   val fhirPathEvaluator:FhirPathEvaluator = {
-    var temp = FhirPathEvaluator.apply(staticContextParams, functionLibraryFactories)
+    var temp = FhirPathEvaluator.apply(staticContextParams, functionLibraryFactories, isContentFhir = isSourceContentFhir)
     terminologyService.foreach(ts => temp = temp.withTerminologyService(ts))
     identityService.foreach(is => temp = temp.withIdentityService(is))
     temp
