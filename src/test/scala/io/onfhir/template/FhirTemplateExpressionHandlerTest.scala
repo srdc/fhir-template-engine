@@ -31,7 +31,7 @@ class FhirTemplateExpressionHandlerTest
   val template4 = Source.fromInputStream(getClass.getResourceAsStream("/templates/template-expression4.json")).mkString.parseJson.extract[FhirExpression]
   val event4Content = Source.fromInputStream(getClass.getResourceAsStream("/resources/communication-event1.json")).mkString.parseJson
 
-  val fhirTemplateExpressionHandler = new FhirTemplateExpressionHandler()
+  val fhirTemplateExpressionHandler = new FhirTemplateExpressionHandler(isSourceContentFhir = true)
 
   "FhirTemplateExpressionHandler" should "handle templates with FHIR path expressions" in{
       val resultFuture = fhirTemplateExpressionHandler.evaluateExpression(template1, Map("careTeamOfPatient" -> context1CareTeam), event1Content)
