@@ -3,7 +3,7 @@ package io.onfhir.template
 import io.onfhir.api.service.{IFhirIdentityService, IFhirTerminologyService}
 import io.onfhir.expression.{FhirExpression, FhirExpressionException, IFhirExpressionLanguageHandler}
 import io.onfhir.path.{FhirPathBoolean, FhirPathComplex, FhirPathDateTime, FhirPathEvaluator, FhirPathNumber, FhirPathQuantity, FhirPathResult, FhirPathString, FhirPathTime, IFhirPathFunctionLibraryFactory}
-import org.json4s.{JArray, JNothing, JNull, JObject, JString, JValue}
+import org.json4s.{JArray, JInt, JNothing, JNull, JObject, JString, JValue}
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.matching.Regex
@@ -191,9 +191,16 @@ class FhirTemplateExpressionHandler(
         //For each entry for the section variable evaluate the section value part, by providing each element of section results as context param
         case _ =>
           sectionResults
-            .map(sectionResult => {
-              evaluateTemplate(valuePart, fhirPathEvaluator.withEnvironmentVariable(sectionFieldVar, sectionResult), input)
-            })
+            .zipWithIndex
+            .map {
+              case (sectionResult, i) =>
+                evaluateTemplate(valuePart,
+                  fhirPathEvaluator
+                    .withEnvironmentVariable(sectionFieldVar, sectionResult)
+                    .withEnvironmentVariable("sectionIndex", JInt(i+1)),
+                  input
+                )
+            }
       }
 
     valueField match {
