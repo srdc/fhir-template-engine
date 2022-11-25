@@ -88,7 +88,7 @@ class FhirTemplateExpressionHandler(
    */
   override def evaluateExpression(expression: FhirExpression, contextParams: Map[String, JValue], input: JValue)(implicit ex: ExecutionContext): Future[JValue] = {
     Future.apply {
-      val fhirTemplate = expression.value.get
+      val fhirTemplate = expression.value.orElse(expression.expression.map(JString(_))).get
       //Get the final evaluator
       val evaluator = if(contextParams.isEmpty) fhirPathEvaluator else fhirPathEvaluator.copy(environmentVariables = fhirPathEvaluator.environmentVariables ++ contextParams)
 
