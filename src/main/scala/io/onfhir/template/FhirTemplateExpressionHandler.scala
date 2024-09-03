@@ -262,6 +262,7 @@ class FhirTemplateExpressionHandler(
           case FhirPathComplex(_) | FhirPathQuantity(_, _) =>
             throw FhirExpressionException(s"FHIR path expression returns complex JSON object although it is used within a FHIR string value!", Some(fhirPathExpression))
           case FhirPathString(s) => s
+          case n:FhirPathNumber if n.isInteger() => n.v.toLong.toString
           case FhirPathNumber(n) => "" + n.toDouble.toString
           case FhirPathBoolean(b) => "" + b
           case dt:FhirPathDateTime =>
